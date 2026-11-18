@@ -73,7 +73,7 @@ function pname(sc,sp,g,num){const key=sc+'|'+sp+'|'+g,id=(TL[key]||[]).find(i=>T
 function askP(k,g,side,key){if(key=='p'){scoreEv(k,g,side,key,0);return}pk={k,g,side,key};pkn='';R(1)}
 function doScore(num){const mv=(document.getElementById('pkmin')||{}).value;lsMin=String(mv||'').replace(/[^0-9+]/g,'');const o=pk;pk=null;scoreEv(o.k,o.g,o.side,o.key,num)}
 function scoreEv(k,g,side,key,num){const L=lbl(k,key),sc=side=='h'?H:A,ak=k+'|'+g,ev={id:Date.now(),side,type:L[0],pts:L[1],num,name:num?pname(sc,k,g,num):'',min:clkMin(k,g),time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})};
-(EVS[ak]=EVS[ak]||[]).push(ev);if(k=='rugby')st(g,side+key,1);else sp2(k,g,side,1);const u=UH[ak].pop();UH[ak].push(()=>{u();EVS[ak]=EVS[ak].filter(x=>x!==ev)})}
+(EVS[ak]=EVS[ak]||[]).push(ev);if(window.MDB)MDB.evIns(k,g,side,sc,ev);if(k=='rugby')st(g,side+key,1);else sp2(k,g,side,1);const u=UH[ak].pop();UH[ak].push(()=>{u();EVS[ak]=EVS[ak].filter(x=>x!==ev);if(window.MDB)MDB.evDel(ev)})}
 const MR={};
 const rg=(k,g)=>MR[k+'|'+g]||(MR[k+'|'+g]={k,g,sig:{},who:{},pc:false,lock:false,pub:false,ob:'',ok:false,rp:'',sat:0,auto:false});
 const isPub=(k,g)=>wo(g,k)?true:(m=>m.lock&&m.pub)(rg(k,g));
@@ -141,7 +141,7 @@ function openScreen(s,tv){
 }
 
 function R(keep){
-autoAp();
+if(window.MDB)MDB.touch();autoAp();
 if(!me&&!guest&&scr!='signup')scr='login';else if(me&&!league&&scr!='login'&&scr!='signup'&&scr!='lg')scr='lg';else if(guest&&!league&&scr!='lg'&&scr!='login'&&scr!='signup')scr='lg';
 if(me){role=ar().some(x=>x.role!='parent')?'school':'parent';if(role=='school'){const ms=mySchools();if(ms.length&&!ms.some(x=>x.n==mySchool))mySchool=ms[0].n}}
 if(!can(scr))scr='dash';
@@ -290,7 +290,7 @@ function dlTpl(){if(!window.XLSX){alert('The Excel tool needs internet to load.'
 function ulTpl(el){const f=el.files[0];if(!f||!window.XLSX)return;const rd=new FileReader();rd.onload=e=>{const wb=XLSX.read(e.target.result,{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:''}).slice(1).filter(r=>r[0]||r[1]);
 const nd=x=>{x=String(x).trim();if(!x)return'';if(/^\d{4}-\d{2}-\d{2}$/.test(x))return x;const d=new Date(x);return isNaN(d)?'x':d.toISOString().slice(0,10)};let add=0,mrg=0,bad=[],dup=[];
 rows.forEach((r,i)=>{const sp=String(r[3]).trim().toLowerCase(),g=String(r[4]).trim(),dob=nd(r[2]),n='Row '+(i+2);if(!String(r[0]).trim()||!String(r[1]).trim()||!['rugby','netball','hockey','chess'].includes(sp)||!GLs(sp).includes(g)||dob=='x'){bad.push(n);return}
-const p={id:Date.now()+i,sc:mySchool,sn:String(r[0]).trim(),nm:String(r[1]).trim(),dob,g,sp,co:r[5],cc:r[6],pa:r[7],pc:r[8],ma:r[9],mm:r[10],mn:r[11],al:r[12],cl:!!dob,by:dob?'school':null,cert:false},ex=players.find(q=>pkey(q)==pkey(p));
+const p={id:(window.MDB?MDB.uid():Date.now()+i),sc:mySchool,sn:String(r[0]).trim(),nm:String(r[1]).trim(),dob,g,sp,co:r[5],cc:r[6],pa:r[7],pc:r[8],ma:r[9],mm:r[10],mn:r[11],al:r[12],cl:!!dob,by:dob?'school':null,cert:false},ex=players.find(q=>pkey(q)==pkey(p));
 if(ex){if(!ex.cl&&dob){Object.assign(ex,p,{id:ex.id});mrg++}else dup.push(n);return}players.push(p);add++});
 alert(add+' player(s) added, '+mrg+' completed from the list.'+(dup.length?'\n\nAlready on the list (skipped): '+dup.join(', '):'')+(bad.length?'\n\nSkipped (missing or invalid details): '+bad.join(', '):'')+'\n\nRows without a date of birth wait for the parent to claim the child.');R(1)};rd.readAsArrayBuffer(f)}
 const XL=()=>`<div class="c"><h3>Add many players: Excel</h3><button class="g" onclick="dlTpl()">⬇ Download Excel template</button> <label class="g" style="display:inline-block;padding:8px 10px;border:1px solid var(--bd);border-radius:8px">⬆ Upload filled sheet<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="ulTpl(this)"></label><div class="w">Required: surname, name, sport and age group. A row without a date of birth waits for the parent to claim the child. Players already on the list are never added twice.</div><div class="w">📷 Scanned paper profiles (PDF): planned for the next phase.</div></div>`;
@@ -298,7 +298,7 @@ let kSc=H,kq='',kid=null,npSp='rugby';let myPar=null;
 const GLs=sp=>sp=='rugby'?AG:SP[sp].ag,escA=x=>esc(x).replace(/"/g,'&quot;');
 const pkey=p=>[p.sc,p.sp||'rugby',p.g,(p.sn||'').trim().toLowerCase(),(p.nm||'').trim().toLowerCase()].join('|');
 function addP(){const g=i=>document.getElementById(i).value.trim();if(!g('psn')||!g('pnm')){alert('Surname and name are required');return}
-const p={id:Date.now(),sc:mySchool,sn:g('psn'),nm:g('pnm'),g:g('pgr'),sp:npSp,cl:false,cert:false,dob:''};
+const p={id:(window.MDB?MDB.uid():Date.now()),sc:mySchool,sn:g('psn'),nm:g('pnm'),g:g('pgr'),sp:npSp,cl:false,cert:false,dob:''};
 if(players.some(q=>pkey(q)==pkey(p))){alert(p.nm+' '+p.sn+' is already on the list for '+cap(npSp)+' · '+p.g+'.');return}
 players.push(p);R(1)}
 const KF=[['kpa','Parent/guardian name & surname','pa'],['kpc','Parent cell number','pc'],['kma','Medical aid','ma'],['kmm','Main member','mm'],['kmn','Medical aid number','mn'],['kal','Allergies / medical notes','al']];
@@ -485,4 +485,54 @@ return h}
 TL[H+'|rugby|1st (U13A)']=[1,2];TN[H+'|rugby|1st (U13A)|1']=8;TN[H+'|rugby|1st (U13A)|2']=10;TL[A+'|rugby|1st (U13A)']=[4];TN[A+'|rugby|1st (U13A)|4']=9;
 ['rugby','netball','hockey','chess'].forEach(k=>(k=='rugby'?AG:SP[k].ag).forEach(g=>APPT[k+'|'+g]='u5'));
 R();
-</script></body></html>
+</script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+window.MDB=(()=>{
+const URL='https://ehvshebhwrvozlecmckr.supabase.co',KEY='sb_publishable_assUN8FeBnyBC0iLFVrMww_Urf_lxF2';
+const UU=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+let c=null,ok=false,fid=null,busy=false,tm=null,applying=false,lastP='',lastT='',lastS='';const sid={},snm={},cid=Math.random().toString(36).slice(2);
+const uid=()=>window.crypto&&crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,h=>{const r=Math.random()*16|0;return(h=='x'?r:(r&3|8)).toString(16)});
+const badge=on=>{let b=document.getElementById('sbst');if(!b){b=document.createElement('div');b.id='sbst';b.style.cssText='position:fixed;right:8px;top:6px;font:11px sans-serif;padding:2px 8px;border-radius:10px;background:#000a;color:#fff;z-index:99';document.body.appendChild(b)}b.textContent=on?'● Saved online':'○ Offline (not saved)';b.style.color=on?'#7CFC9A':'#ffb86b'};
+function apply(st){applying=true;try{if(st.M)M=st.M;[[RS,st.RS],[EVS,st.EVS],[CLK,st.CLK]].forEach(([o,n])=>{Object.keys(o).forEach(k=>delete o[k]);Object.assign(o,n||{})})}finally{applying=false}R(1)}
+async function load(){
+ if(!window.supabase){badge(0);return}
+ try{c=supabase.createClient(URL,KEY);
+ const[s,f]=await Promise.all([c.from('schools').select('id,name'),c.from('fixtures').select('id,home_id,away_id,created_at').order('created_at')]);
+ if(s.error||f.error)throw(s.error||f.error);
+ s.data.forEach(x=>{sid[x.name]=x.id;snm[x.id]=x.name});
+ const f0=f.data.find(x=>x.home_id==sid[H]&&x.away_id==sid[A]);if(!f0)throw new Error('fixture not found');fid=f0.id;
+ let pl=await c.from('players').select('*');if(pl.error)throw pl.error;
+ if(!pl.data.length){const rows=players.map(p=>({id:uid(),school_id:sid[p.sc],surname:p.sn,name:p.nm,sport:p.sp||'rugby',age_group:p.g,dob:p.dob||null,certified:!!p.cert})).filter(r=>r.school_id);
+  const ins=await c.from('players').upsert(rows,{onConflict:'school_id,surname,name,sport,age_group',ignoreDuplicates:true});if(ins.error)throw ins.error;
+  pl=await c.from('players').select('*');if(pl.error)throw pl.error}
+ const keep=players.filter(p=>!UU.test(p.id)).length;
+ players.splice(0,players.length,...pl.data.map(r=>({id:r.id,sc:snm[r.school_id],sn:r.surname,nm:r.name,sp:r.sport,g:r.age_group,dob:r.dob||'',cl:!!r.dob,by:r.dob?'school':null,cert:r.certified})));
+ const tl=await c.from('team_lists').select('id,school_id,sport,age_group,submitted,team_list_players(player_id,shirt_no)').eq('fixture_id',fid);if(tl.error)throw tl.error;
+ [TL,TN,TV].forEach(o=>Object.keys(o).forEach(k=>delete o[k]));
+ tl.data.forEach(t=>{const k=snm[t.school_id]+'|'+t.sport+'|'+t.age_group;TL[k]=t.team_list_players.map(x=>x.player_id);t.team_list_players.forEach(x=>TN[k+'|'+x.player_id]=x.shirt_no);if(t.submitted)TV[k]=1});
+ const ms=await c.from('match_state').select('state').eq('fixture_id',fid).eq('sport','all').eq('age_group','all').maybeSingle();
+ if(ms.data&&ms.data.state&&ms.data.state.M)apply(ms.data.state);
+ c.channel('ms').on('postgres_changes',{event:'*',schema:'public',table:'match_state',filter:'fixture_id=eq.'+fid},p=>{const st=p.new&&p.new.state;if(st&&st.by!=cid)apply(st)}).subscribe();
+ ok=true;lastP=JSON.stringify(plRows());lastT=JSON.stringify([TL,TN,TV]);badge(1);R(1)
+ }catch(e){console.warn('Supabase',e);badge(0)}}
+const plRows=()=>players.filter(p=>UU.test(p.id)&&sid[p.sc]).map(p=>({id:p.id,school_id:sid[p.sc],surname:p.sn,name:p.nm,sport:p.sp||'rugby',age_group:p.g,dob:p.dob||null,certified:!!p.cert}));
+function touch(){if(!ok||applying||role!='school')return;clearTimeout(tm);tm=setTimeout(flush,900)}
+async function flush(){if(busy){tm=setTimeout(flush,900);return}busy=true;try{
+ const pr=plRows(),ps=JSON.stringify(pr);
+ if(ps!=lastP&&pr.length){const r=await c.from('players').upsert(pr);if(r.error)throw r.error;lastP=ps}
+ const ts=JSON.stringify([TL,TN,TV]);
+ if(ts!=lastT){for(const k of Object.keys(TL)){const[sc,sp,g]=k.split('|');if(!sid[sc])continue;const ids=TL[k].filter(i=>UU.test(i)),now=new Date().toISOString();
+  const r=await c.from('team_lists').upsert(Object.assign({fixture_id:fid,school_id:sid[sc],sport:sp,age_group:g,submitted:!!TV[k],updated_at:now},TV[k]?{submitted_at:now}:{}),{onConflict:'fixture_id,school_id,sport,age_group'}).select('id').single();if(r.error)throw r.error;
+  const d=await c.from('team_list_players').delete().eq('team_list_id',r.data.id);if(d.error)throw d.error;
+  if(ids.length){const w=await c.from('team_list_players').insert(ids.map(i=>({team_list_id:r.data.id,player_id:i,shirt_no:TN[k+'|'+i]||null})));if(w.error)throw w.error}}
+  lastT=ts}
+ const st=JSON.stringify({M,RS,EVS,CLK});
+ if(st!=lastS){const r=await c.from('match_state').upsert({fixture_id:fid,sport:'all',age_group:'all',state:{M,RS,EVS,CLK,by:cid},updated_at:new Date().toISOString()});if(r.error)throw r.error;lastS=st}
+ badge(1)}catch(e){console.warn('Supabase save',e);badge(0)}finally{busy=false}}
+function evIns(k,g,side,sc,e){if(!ok||role!='school')return;e.dbid=uid();const key=sc+'|'+k+'|'+g,pid=(TL[key]||[]).find(i=>TN[key+'|'+i]==e.num);
+ c.from('match_events').insert({id:e.dbid,fixture_id:fid,sport:k,age_group:g,side,event_type:String(e.type),points:Number(e.pts)||null,shirt_no:e.num?+e.num:null,player_id:UU.test(pid)?pid:null,minute:String(e.min||'')}).then(r=>{if(r.error)console.warn('event',r.error)})}
+function evDel(e){if(ok&&e.dbid)c.from('match_events').delete().eq('id',e.dbid).then(()=>{})}
+setTimeout(load,0);
+return{uid,touch,evIns,evDel,load}})();
+</script>
+</body></html>
